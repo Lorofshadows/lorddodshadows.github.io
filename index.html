@@ -2,10 +2,22 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Простой сайт</title>
+  <title>Ваш IP</title>
 </head>
 <body>
-  <h1>Привет, мир!</h1>
-  <p>Это мой первый сайт на GitHub Pages.</p>
+  <h1>Ваш IP адрес</h1>
+  <p id="ip">Загрузка...</p>
+
+  <script>
+    // Получение IP через публичный API https://api.ipify.org
+    fetch('https://api.ipify.org?format=json')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('ip').textContent = data.ip;
+      })
+      .catch(() => {
+        document.getElementById('ip').textContent = 'Не удалось определить IP';
+      });
+  </script>
 </body>
 </html>
